@@ -12,7 +12,7 @@ Battery current
 Battery power
 
 Measured data are transmitted via SigFox modem to ThingSpeak cloud for storage and analysis.
-Measured data are also sent to second Arduino (greenhouse_DAQ_display) via I2C bus to be accessible locally.
+Measured data are also sent to second Arduino (greenhouse_DAQ_display) via I2C bus to be accessible locally at the greenhouse.
 
 ## Arduino Pro Mini 5 V 16 MHz
 Tweaks:
