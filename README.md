@@ -1,5 +1,4 @@
-# greenhouse DAQ unit
-DAQ unit for greenhouse.
+# Greenhouse DAQ unit
 
 DAQ unit for greenhouse weather station. Following data to be gathered:
 Temperature inside
