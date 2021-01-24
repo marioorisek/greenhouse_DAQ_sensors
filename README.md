@@ -1,4 +1,4 @@
-# greenhouse_DAQ_sensors
+# greenhouse DAQ unit
 DAQ unit for greenhouse.
 
 DAQ unit for greenhouse weather station. Following data to be gathered:
@@ -11,13 +11,16 @@ Battery voltage
 Battery current
 Battery power
 
+Measured data are transmitted via SigFox modem to ThingSpeak cloud for storage and analysis.
+Measured data are also sent to second Arduino (greenhouse_DAQ_display) via I2C bus to be accessible locally.
+
 ## Arduino Pro Mini 5 V 16 MHz
 Tweaks:
 - removed PWR LED
 - removed voltage regulator
 
 ## Sensors:
-BME 280
+### BME 280
 - temperature inside
 - humidity inside
 - atmospheric pressure
