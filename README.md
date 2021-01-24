@@ -1,14 +1,15 @@
 # Greenhouse DAQ unit
 
-DAQ unit for greenhouse weather station. Following data to be gathered:
-Temperature inside
-Humidity inside
-Temperature outside
-Atmospheric pressure
-Light instensity 
-Battery voltage
-Battery current
-Battery power
+DAQ unit for greenhouse weather station. <br>
+Following data to be gathered:
+- Temperature inside
+- Humidity inside
+- Temperature outside
+- Atmospheric pressure
+- Light instensity 
+- Battery voltage
+- Battery current
+- Battery power
 
 Measured data are transmitted via SigFox modem to ThingSpeak cloud for storage and analysis.<br>
 Measured data are also sent to second Arduino (greenhouse_DAQ_display) via I2C bus to be accessible locally at the greenhouse.
