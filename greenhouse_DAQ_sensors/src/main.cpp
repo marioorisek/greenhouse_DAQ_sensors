@@ -10,7 +10,7 @@
 #include <Sleep_n0m1.h>
 #include <SoftwareSerial.h>
 #include <BME280I2C.h>
-
+#include <BH1750.h>
 
 // SigFox modem serial link
 #define rxPin 8
@@ -21,6 +21,9 @@ SoftwareSerial sigfox = SoftwareSerial(rxPin, txPin);
 
 // BME 280 sensor init
 BME280I2C bme;
+
+// BH 1750 sensor init
+BH1750 lightMeter;
 
 // create sleep object
 Sleep sleep;
@@ -64,6 +67,19 @@ int power = 0;
 boolean abortSleep = false;
 char str[20];
 
+void read_outside_temperature(bool debug) {
+  // read outside temperature
+
+  sens_DS_out.requestTemperatures();
+  delay(1000);
+  temp_out[loops] = 10 * sens_DS_out.getTempCByIndex(0);
+
+  if (debug) {
+    Serial.print("T out: ");
+    Serial.print(float(temp_out[loops] / 10.0), 1);
+    Serial.print(" °C ; ");
+  }
+}
 
 void sendSigFoxData() {
   sprintf(str, "AT$SF=%04X%04X%02X%04X%04X\n", temp_in_avg, temp_out_avg, humidity_in_avg, voltage_avg, current_avg);
@@ -92,8 +108,6 @@ long calcAverage(unsigned int data[]) {
   return sum / SIGFOX_INTERVAL;
 }
 
-
-
 void calcPower (bool verb) {
   power = (voltage[loops] * current[loops]) / 1000;
   if (verb) {
@@ -107,7 +121,8 @@ void readCurrent(bool verb) {
   current[loops] = ina3221.getCurrent_mA(2);
   if (verb) {
     Serial.print(" ");
-    Serial.print(ina3221.getCurrent_mA(2));    Serial.print(" mA ");
+    Serial.print(ina3221.getCurrent_mA(2), 1);
+    Serial.print(" mA ");
   }
 }
 
@@ -121,15 +136,14 @@ void readVoltage(bool verb) {
   }
 }
 
-
 void calcAverage() {
   temp_in_avg = calcAverage(temp_in);
   temp_out_avg = calcAverage(temp_out);
   voltage_avg = calcAverage(voltage);
   current_avg = calcAverage(current);
   humidity_in_avg = calcAverage(humidity_in);
-  light_avg = calcAverage(light);
   pressure_avg = calcAverage(pressure);
+  light_avg = calcAverage(light);
 
   if (debug) {
     Serial.println();
@@ -151,6 +165,16 @@ void calcAverage() {
     Serial.println(" deg. C");
 
     Serial.println();
+    Serial.print("Air pressure: ");
+    Serial.print(pressure_avg);
+    Serial.println(" hPa");
+
+    Serial.println();
+    Serial.print("Light intensity: ");
+    Serial.print(light_avg);
+    Serial.println(" lux");
+
+    Serial.println();
     Serial.println("Battery");
     Serial.print("Voltage: ");
     Serial.print(voltage_avg / 1000.0);
@@ -167,20 +191,11 @@ void calcAverage() {
   }
 }
 
+int altitudeCompensation(float pressure) {
+  return round(pressure / exp(-127.819679967 / (0.831432 * (2731.5 + temp_in[loops]))));
+}
 
-void runMeasurement(bool debug) {
-
-  // read outside temperature
-
-  sens_DS_out.requestTemperatures();
-  delay(1000);
-  temp_out[loops] = 10 * sens_DS_out.getTempCByIndex(0);
-
-  if (debug) {
-    Serial.print("T out: ");
-    Serial.print(float(temp_out[loops] / 10.0));
-    Serial.print(" °C ; ");
-  }
+void read_inside_temperature(bool debug) {
 
   BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
   BME280::PresUnit presUnit(BME280::PresUnit_hPa);
@@ -190,20 +205,40 @@ void runMeasurement(bool debug) {
 
   temp_in[loops] = 10 * temp;
   humidity_in[loops] = hum;
-  pressure[loops] = pres;
+  pressure[loops] = altitudeCompensation(pres);
 
   if (debug) {
     Serial.print("T in: ");
-    Serial.print(float(temp_in[loops] / 10.0));
+    Serial.print(float(temp_in[loops] / 10.0),1);
     Serial.print(" °C ; ");
     Serial.print("H in: ");
     Serial.print(humidity_in[loops]);
     Serial.print(" % ; ");
-    Serial.print("Pressure: ");
+    Serial.print("Air pressure: ");
     Serial.print(pressure[loops]);
     Serial.print(" hPa ; ");
   }
 
+}
+
+void read_light(bool debug) {
+
+  light[loops] = lightMeter.readLightLevel();
+  lightMeter.configure(BH1750::ONE_TIME_HIGH_RES_MODE);
+
+
+  if (debug) {
+    Serial.print("Light intensity: ");
+    Serial.print(light[loops]);
+    Serial.print(" lux ; ");
+  }
+}
+
+void runMeasurement(bool debug) {
+
+  read_outside_temperature(debug);
+  read_inside_temperature(debug);
+  read_light(debug);
   readVoltage(debug);
   readCurrent(debug);
   calcPower(debug);
@@ -212,7 +247,6 @@ void runMeasurement(bool debug) {
     Serial.println();
   }
 }
-
 
 void setup(void) {
 
@@ -238,15 +272,15 @@ void setup(void) {
   sigfox.begin(9600);
   Wire.begin();
 
-
   // init DS1820 sensor
   sens_DS_out.begin();
   sens_DS_out.setResolution(12); // set resolution to 12-bit
 
-
   // init BME 280 Sensor
   bme.begin();
 
+  // BH1750 sensor init
+  lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE);
 
   // current probe init
   // INA 3221 datasheet Table 5
