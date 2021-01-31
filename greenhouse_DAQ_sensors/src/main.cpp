@@ -12,6 +12,9 @@
 #include <BME280I2C.h>
 #include <BH1750.h>
 
+// Display arduino I2C address
+#define DISPLAY_ARDUINO_I2C_ADDRESS 50
+
 // SigFox modem serial link
 #define rxPin 8
 #define txPin 9
@@ -42,11 +45,11 @@ SDL_Arduino_INA3221 ina3221;
 // global variables
 #define SIGFOX_INTERVAL 15   // in minutes
 byte loops = 0;
-int temp_in[SIGFOX_INTERVAL];
-int temp_in_avg = 0;
+int temperature_in[SIGFOX_INTERVAL];
+int temperature_in_avg = 0;
 
-int temp_out[SIGFOX_INTERVAL];
-int temp_out_avg = 0;
+int temperature_out[SIGFOX_INTERVAL];
+int temperature_out_avg = 0;
 
 int humidity_in[SIGFOX_INTERVAL];
 byte humidity_in_avg = 0;
@@ -65,24 +68,44 @@ int current_avg = 0;
 
 int power = 0;
 boolean abortSleep = false;
-char str[20];
+char str[50];
 
-void read_outside_temperature(bool debug) {
+void readOutsideTemperature(bool debug) {
   // read outside temperature
 
   sens_DS_out.requestTemperatures();
   delay(1000);
-  temp_out[loops] = 10 * sens_DS_out.getTempCByIndex(0);
+  temperature_out[loops] = 10 * sens_DS_out.getTempCByIndex(0);
 
   if (debug) {
     Serial.print("T out: ");
-    Serial.print(float(temp_out[loops] / 10.0), 1);
+    Serial.print(float(temperature_out[loops] / 10.0), 1);
     Serial.print(" °C ; ");
   }
 }
 
+void sendToDisplay(byte screen_id, bool debug) {
+
+  sprintf(str, "%04X%04X%02X%04X%04X%04X%04X%04X", temperature_out[loops], temperature_in[loops], humidity_in[loops], pressure[loops], light[loops], voltage[loops], current[loops], power);
+  Wire.beginTransmission(DISPLAY_ARDUINO_I2C_ADDRESS);
+  Wire.write(str);
+  Wire.endTransmission();
+
+  if (debug) {
+    Serial.print(str);
+    Serial.println(" data sent to Display Arduino");
+  }
+}
+
 void sendSigFoxData() {
-  sprintf(str, "AT$SF=%04X%04X%02X%04X%04X\n", temp_in_avg, temp_out_avg, humidity_in_avg, voltage_avg, current_avg);
+  byte batt_volt;
+  if (voltage_avg > 8){
+    batt_volt = (voltage_avg - 8) / 0.03;
+  } else {
+    batt_volt = 8;
+  }
+
+  sprintf(str, "AT$SF=%04X%04X%02X%02X%04X%04X%04X\n", temperature_in_avg, temperature_out_avg, humidity_in_avg, batt_volt, current_avg, light_avg, pressure_avg);
   digitalWrite(sigfoxPwrPin1, HIGH); // power up SigFox modem
   digitalWrite(sigfoxPwrPin2, HIGH); // power up SigFox modem
   delay(2000);
@@ -90,6 +113,11 @@ void sendSigFoxData() {
   delay(10000);
   digitalWrite(sigfoxPwrPin1, LOW); // power down SigFox modem
   digitalWrite(sigfoxPwrPin2, LOW); // power down SigFox modem
+
+  if (debug) {
+    Serial.print(str);
+    Serial.println(" String sent to SigFox modem.");
+  }
 }
 
 long calcAverage(int data[]) {
@@ -137,8 +165,8 @@ void readVoltage(bool verb) {
 }
 
 void calcAverage() {
-  temp_in_avg = calcAverage(temp_in);
-  temp_out_avg = calcAverage(temp_out);
+  temperature_in_avg = calcAverage(temperature_in);
+  temperature_out_avg = calcAverage(temperature_out);
   voltage_avg = calcAverage(voltage);
   current_avg = calcAverage(current);
   humidity_in_avg = calcAverage(humidity_in);
@@ -151,7 +179,7 @@ void calcAverage() {
     Serial.println(" min interval averages:");
     Serial.println("Inside: ");
     Serial.print("Temperature: ");
-    Serial.print(temp_in_avg / 10.0);
+    Serial.print(temperature_in_avg / 10.0);
     Serial.print(" deg. C ; ");
 
     Serial.print("Humidity: ");
@@ -161,7 +189,7 @@ void calcAverage() {
     Serial.println();
     Serial.println("Outside");
     Serial.print("Temperature: ");
-    Serial.print(temp_out_avg / 10.0);
+    Serial.print(temperature_out_avg / 10.0);
     Serial.println(" deg. C");
 
     Serial.println();
@@ -192,10 +220,10 @@ void calcAverage() {
 }
 
 int altitudeCompensation(float pressure) {
-  return round(pressure / exp(-127.819679967 / (0.831432 * (2731.5 + temp_in[loops]))));
+  return round(pressure / exp(-127.819679967 / (0.831432 * (2731.5 + temperature_in[loops]))));
 }
 
-void read_inside_temperature(bool debug) {
+void readInsideTemperature(bool debug) {
 
   BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
   BME280::PresUnit presUnit(BME280::PresUnit_hPa);
@@ -203,13 +231,13 @@ void read_inside_temperature(bool debug) {
   float temp(NAN), hum(NAN), pres(NAN);
   bme.read(pres, temp, hum, tempUnit, presUnit);
 
-  temp_in[loops] = 10 * temp;
+  temperature_in[loops] = 10 * temp;
   humidity_in[loops] = hum;
   pressure[loops] = altitudeCompensation(pres);
 
   if (debug) {
     Serial.print("T in: ");
-    Serial.print(float(temp_in[loops] / 10.0),1);
+    Serial.print(float(temperature_in[loops] / 10.0),1);
     Serial.print(" °C ; ");
     Serial.print("H in: ");
     Serial.print(humidity_in[loops]);
@@ -221,7 +249,7 @@ void read_inside_temperature(bool debug) {
 
 }
 
-void read_light(bool debug) {
+void readLightIntensity(bool debug) {
 
   light[loops] = lightMeter.readLightLevel();
   lightMeter.configure(BH1750::ONE_TIME_HIGH_RES_MODE);
@@ -236,9 +264,9 @@ void read_light(bool debug) {
 
 void runMeasurement(bool debug) {
 
-  read_outside_temperature(debug);
-  read_inside_temperature(debug);
-  read_light(debug);
+  readOutsideTemperature(debug);
+  readInsideTemperature(debug);
+  readLightIntensity(debug);
   readVoltage(debug);
   readCurrent(debug);
   calcPower(debug);
@@ -302,6 +330,7 @@ void loop(void) {
     loops = 0;
   }
   runMeasurement(debug);
+  sendToDisplay(1, debug);
 
   loops++;
   sleep.sleepDelay(5000, abortSleep); // 55000
