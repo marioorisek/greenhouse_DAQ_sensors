@@ -16,10 +16,8 @@
 #define DISPLAY_ARDUINO_I2C_ADDRESS 50
 
 // SigFox modem serial link
-#define rxPin 8
-#define txPin 9
-#define sigfoxPwrPin1 11
-#define sigfoxPwrPin2 12
+#define rxPin 9
+#define txPin 8
 SoftwareSerial sigfox = SoftwareSerial(rxPin, txPin);
 
 // BME 280 sensor init
@@ -84,7 +82,7 @@ void readOutsideTemperature(bool debug) {
   }
 }
 
-void sendToDisplay(byte screen_id, bool debug) {
+void sendToDisplay(bool debug) {
 
   sprintf(str, "%04X%04X%02X%04X%04X%04X%04X%04X", temperature_out[loops], temperature_in[loops], humidity_in[loops], pressure[loops], light[loops], voltage[loops], current[loops], power);
   Wire.beginTransmission(DISPLAY_ARDUINO_I2C_ADDRESS);
@@ -106,13 +104,9 @@ void sendSigFoxData() {
   }
 
   sprintf(str, "AT$SF=%04X%04X%02X%02X%04X%04X%04X\n", temperature_in_avg, temperature_out_avg, humidity_in_avg, batt_volt, current_avg, light_avg, pressure_avg);
-  digitalWrite(sigfoxPwrPin1, HIGH); // power up SigFox modem
-  digitalWrite(sigfoxPwrPin2, HIGH); // power up SigFox modem
-  delay(2000);
+
   sigfox.print(str);
   delay(10000);
-  digitalWrite(sigfoxPwrPin1, LOW); // power down SigFox modem
-  digitalWrite(sigfoxPwrPin2, LOW); // power down SigFox modem
 
   if (debug) {
     Serial.print(str);
@@ -137,7 +131,9 @@ long calcAverage(unsigned int data[]) {
 }
 
 void calcPower (bool verb) {
-  power = (voltage[loops] * current[loops]) / 1000;
+  float tmp;
+  tmp = float(voltage[loops]) * float(current[loops]) * 0.001;
+  power = int(tmp);
   if (verb) {
     Serial.print(" ");
     Serial.print(power);
@@ -288,8 +284,7 @@ void setup(void) {
 
   pinMode(rxPin, INPUT);
   pinMode(txPin, OUTPUT);
-  pinMode(sigfoxPwrPin1, OUTPUT);
-  pinMode(sigfoxPwrPin2, OUTPUT);
+
 
   power_adc_disable(); // ADC converter
   power_spi_disable(); // SPI
@@ -317,10 +312,8 @@ void setup(void) {
 
   ina3221.wireWriteRegister(0x0, 0x2493);
   ina3221.begin();
-
   delay(500);
-
-}
+  }
 
 void loop(void) {
 
@@ -330,8 +323,9 @@ void loop(void) {
     loops = 0;
   }
   runMeasurement(debug);
-  sendToDisplay(1, debug);
+  sendToDisplay(debug);
 
   loops++;
   sleep.sleepDelay(5000, abortSleep); // 55000
+
 }
