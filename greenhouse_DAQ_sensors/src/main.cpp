@@ -335,6 +335,6 @@ void loop(void) {
   sendToDisplay(debug);
 
   loops++;
-  sleep.sleepDelay(10000, abortSleep); // 55000
+  sleep.sleepDelay(55000, abortSleep); // 55000
 
 }
