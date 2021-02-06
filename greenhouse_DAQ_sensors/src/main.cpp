@@ -14,6 +14,7 @@
 
 // Display arduino I2C address
 #define DISPLAY_ARDUINO_I2C_ADDRESS 50
+#define BUFFER_SIZE 70
 
 // SigFox modem serial link
 #define rxPin 9
@@ -49,7 +50,7 @@ int temperature_in_avg = 0;
 int temperature_out[SIGFOX_INTERVAL];
 int temperature_out_avg = 0;
 
-int humidity_in[SIGFOX_INTERVAL];
+byte humidity_in[SIGFOX_INTERVAL];
 byte humidity_in_avg = 0;
 
 int pressure[SIGFOX_INTERVAL];
@@ -66,7 +67,7 @@ int current_avg = 0;
 
 int power = 0;
 boolean abortSleep = false;
-char str[50];
+char buff[BUFFER_SIZE];
 
 void readOutsideTemperature(bool debug) {
   // read outside temperature
@@ -84,13 +85,13 @@ void readOutsideTemperature(bool debug) {
 
 void sendToDisplay(bool debug) {
 
-  sprintf(str, "%04X%04X%02X%04X%04X%04X%04X%04X", temperature_out[loops], temperature_in[loops], humidity_in[loops], pressure[loops], light[loops], voltage[loops], current[loops], power);
+  sprintf(buff, "%04X%04X%02X%04X%04X%04X%04X%04X", temperature_out[loops], temperature_in[loops], humidity_in[loops], pressure[loops], light[loops], voltage[loops], current[loops], power);
   Wire.beginTransmission(DISPLAY_ARDUINO_I2C_ADDRESS);
-  Wire.write(str);
+  Wire.write(buff);
   Wire.endTransmission();
 
-  if (debug) {
-    Serial.print(str);
+    Serial.print(buff);
+    if (debug) {
     Serial.println(" data sent to Display Arduino");
   }
 }
@@ -103,20 +104,28 @@ void sendSigFoxData() {
     batt_volt = 8;
   }
 
-  sprintf(str, "AT$SF=%04X%04X%02X%02X%04X%04X%04X\n", temperature_in_avg, temperature_out_avg, humidity_in_avg, batt_volt, current_avg, light_avg, pressure_avg);
+  sprintf(buff, "AT$SF=%04X%04X%02X%02X%04X%04X%04X\n", temperature_in_avg, temperature_out_avg, humidity_in_avg, batt_volt, current_avg, light_avg, pressure_avg);
 
-  sigfox.print(str);
+  sigfox.print(buff);
   delay(10000);
 
   if (debug) {
-    Serial.print(str);
+    Serial.print(buff);
     Serial.println(" String sent to SigFox modem.");
   }
 }
 
 long calcAverage(int data[]) {
   long sum = 0;
-  for (int i = 0; i < SIGFOX_INTERVAL; i++) {
+  for (byte i = 0; i < SIGFOX_INTERVAL; i++) {
+    sum += data[i];
+  }
+  return sum / SIGFOX_INTERVAL;
+}
+
+byte calcAverage(byte data[]) {
+  long sum = 0;
+  for (byte i = 0; i < SIGFOX_INTERVAL; i++) {
     sum += data[i];
   }
   return sum / SIGFOX_INTERVAL;
@@ -124,7 +133,7 @@ long calcAverage(int data[]) {
 
 long calcAverage(unsigned int data[]) {
   long sum = 0;
-  for (int i = 0; i < SIGFOX_INTERVAL; i++) {
+  for (byte i = 0; i < SIGFOX_INTERVAL; i++) {
     sum += data[i];
   }
   return sum / SIGFOX_INTERVAL;
@@ -326,6 +335,6 @@ void loop(void) {
   sendToDisplay(debug);
 
   loops++;
-  sleep.sleepDelay(5000, abortSleep); // 55000
+  sleep.sleepDelay(10000, abortSleep); // 55000
 
 }
