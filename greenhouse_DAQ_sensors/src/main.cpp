@@ -99,7 +99,7 @@ void sendToDisplay(bool debug) {
 void sendSigFoxData() {
   byte batt_volt;
   if (voltage_avg > 8){
-    batt_volt = byte(float((voltage_avg - 8.0)) / 0.03);
+    batt_volt = byte(float(((voltage_avg * 0.001) - 8.0)) / 0.03);
   } else {
     batt_volt = 8;
   }
