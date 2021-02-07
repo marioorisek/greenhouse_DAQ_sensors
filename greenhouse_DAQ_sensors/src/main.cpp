@@ -17,8 +17,8 @@
 #define BUFFER_SIZE 70
 
 // SigFox modem serial link
-#define rxPin 9
-#define txPin 8
+#define rxPin 10
+#define txPin 7
 SoftwareSerial sigfox = SoftwareSerial(rxPin, txPin);
 
 // BME 280 sensor init
@@ -99,7 +99,7 @@ void sendToDisplay(bool debug) {
 void sendSigFoxData() {
   byte batt_volt;
   if (voltage_avg > 8){
-    batt_volt = (voltage_avg - 8) / 0.03;
+    batt_volt = byte(float((voltage_avg - 8.0)) / 0.03);
   } else {
     batt_volt = 8;
   }
